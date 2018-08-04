@@ -48,10 +48,12 @@ NeuralNet_create (const int nInputs, double *netInputs, const int nLayer, int *n
     net->neurons = malloc (sizeof(NeuralNetNeuron) * net->nNeurons);
     net->neuronOutputs = malloc (sizeof(double) * net->nNeurons);
     net->neuronErrors = malloc (sizeof(double) * net->nNeurons);
+
     
     // set the pointer to the outputs of the network, this way it is easier to handle later on
-    net->outputs = &net->neuronOutputs[net->nNeurons - net->layers[net->nLayer - 1].nNeurons];
-    
+    //net->outputs = &net->neuronOutputs[net->nNeurons - net->layers[net->nLayer - 1].nNeurons];
+    net->outputs = &net->neuronOutputs[net->nNeurons - nNeurons[net->nLayer - 1]];
+
     // initialize outputs and errors with 0 and set the neuron pointers
     for (int i = 0; i < net->nNeurons; i++)
     {
@@ -62,14 +64,14 @@ NeuralNet_create (const int nInputs, double *netInputs, const int nLayer, int *n
         net->neurons[i].error = &net->neuronErrors[i];
     }
 
-    
-    net->layers = malloc (sizeof(NeuralNetLayer)); // create layers
+
+    net->layers = malloc (sizeof(NeuralNetLayer) * net->nLayer); // create layers
 
     int neuronCounter = 0;
     int weightCounter = 0;
     int inputCounter = 0;
 
-    for (int i = 0; i < net->nLayer; i++)
+    for (int i = 0; i < net->nLayer; i++) // cycling the layers
     {
         net->layers[i].nNeurons = nNeurons[i];
         
@@ -80,20 +82,27 @@ NeuralNet_create (const int nInputs, double *netInputs, const int nLayer, int *n
             net->neurons[neuronCounter].inputs = netInputs;
             // the inputs to the first layer equal the inputs to the network
         }
+        else
+        {
+            net->layers[i].neurons = &net->neurons[net->layers[i - 1].nNeurons];
+            net->layers[i].neurons->nInputs = net->layers[i - 1].nNeurons;
+            net->neurons[neuronCounter].inputs = &net->neuronOutputs[inputCounter];
+        }
 
-        for (int j = 0; j < net->layers[i].nNeurons; j++)
+        for (int j = 0; j < net->layers[i].nNeurons; j++) // cycling the neurons in one layer
         {
             if (i > 0)
                 net->neurons[neuronCounter].inputs = &net->inputs[inputCounter];
 
             neuronCounter++;
             weightCounter += net->layers[i].neurons->nInputs;
+            // the number of inputs to each neuron in one layer is equivalent
         }
         
         if (i > 0)
-            inputCounter += net->layers[i].neurons->nInputs;
+            inputCounter += net->layers[i - 1].neurons->nInputs;
     }
-    
+
     return net;
 }
 
