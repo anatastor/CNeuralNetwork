@@ -24,6 +24,7 @@ NeuralNet_create (const int nInputs, double *netInputs, const int nLayer, int *n
 
     net->nInputs = nInputs;
     net->nLayer = nLayer;
+    net->netInputs = netInputs;
     
     // use members as counters and initialize them
     net->nNeurons = 0;
@@ -79,24 +80,29 @@ NeuralNet_create (const int nInputs, double *netInputs, const int nLayer, int *n
         {
             net->layers[i].neurons = &net->neurons[0];
             net->layers[i].neurons->nInputs = nInputs;
-            net->neurons[neuronCounter].inputs = netInputs;
             // the inputs to the first layer equal the inputs to the network
         }
         else
         {
             net->layers[i].neurons = &net->neurons[net->layers[i - 1].nNeurons];
             net->layers[i].neurons->nInputs = net->layers[i - 1].nNeurons;
-            net->neurons[neuronCounter].inputs = &net->neuronOutputs[inputCounter];
+            net->layers[i].neurons->inputs = &net->neuronOutputs[inputCounter];
         }
 
         for (int j = 0; j < net->layers[i].nNeurons; j++) // cycling the neurons in one layer
         {
+            if (i == 0)
+                net->layers[i].neurons[j].inputs = netInputs;
+
             if (i > 0)
-                net->neurons[neuronCounter].inputs = &net->inputs[inputCounter];
+                net->neurons[neuronCounter].inputs = &net->outputs[inputCounter];
+                // define the outputs of previous neuron as inputs to the next ones
+
+            net->neurons[neuronCounter].weights = &net->weights[weightCounter];
+            net->neurons[neuronCounter].oldWeights = &net->oldWeights[weightCounter];
 
             neuronCounter++;
             weightCounter += net->layers[i].neurons->nInputs;
-            // the number of inputs to each neuron in one layer is equivalent
         }
         
         if (i > 0)
@@ -110,7 +116,7 @@ NeuralNet_create (const int nInputs, double *netInputs, const int nLayer, int *n
 void
 NeuralNet_free (NeuralNet **net)
 {   
-    free ((*net)->inputs);
+    free ((*net)->netInputs);
 
     free ((*net)->neurons);
     free ((*net)->weights);
@@ -134,9 +140,10 @@ NeuralNet_calculate (NeuralNet *net)
         for (int j = 0; j < net->layers[i].nNeurons; j++)
         {
             *net->layers[i].neurons[j].output = 0;
-            for (int k = 0; k < net->layers[i].neurons->nInputs; k++)
+            int nInputs = net->layers[i].neurons->nInputs;
+            for (int k = 0; k < nInputs; k++)
             {
-                *net->layers[i].neurons[j].output += net->layers[i].neurons[j].inputs[k] * 
+                *net->layers[i].neurons[j].output += net->layers[i].neurons[j].inputs[k] *
                     net->layers[i].neurons[j].weights[k];
             }
 
@@ -151,7 +158,7 @@ NeuralNet_train (NeuralNet *net, double *trainingIn, double *trainingOut, const 
 {   
     // copy the data from the trainingInputSet to the input set
     for (int i = 0; i < net->nInputs; i++)
-        net->inputs[i] = trainingIn[i];
+        net->netInputs[i] = trainingIn[i];
     
     for (int it = 0; it < iterations; it++)
     {

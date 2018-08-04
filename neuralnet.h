@@ -32,7 +32,7 @@ typedef struct NeuralNetLayer
 typedef struct NeuralNet
 {
     int nInputs; // number of inputs to the neural network
-    double *inputs; // pointer to the input array
+    double *netInputs; // pointer to the input array
     double *outputs; // pointer to the outputs
 
     double *weights; // array of weights
