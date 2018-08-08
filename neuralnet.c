@@ -2,6 +2,26 @@
 #include "neuralnet.h"
 
 
+void NeuralNet_print (NeuralNet *net)
+{
+    for (int i = 0; i < net->nLayer; i++)
+    {
+        for (int j = 0; j < net->layers[i].nNeurons; j++)
+        {
+            for (int k = 0; k < net->layers[i].neurons[j].nInputs; k++)
+            {
+                printf ("\ni: %i | j: %i | k: %i", i, j, k);
+                printf (" | input: %lf | weight: %lf | output: %lf",
+                        net->layers[i].neurons[j].inputs[k],
+                        net->layers[i].neurons[j].weights[k],
+                        *net->layers[i].neurons[j].output);
+            }
+        }
+    }
+    printf ("\n");
+}
+
+
 double NeuralNet_rand (void)
 {
     return (double)rand()/RAND_MAX * 2.0 - 1.0;
@@ -9,9 +29,9 @@ double NeuralNet_rand (void)
 
 
 double
-NeuralNetNeuron_sigmoid_derivate (NeuralNetNeuron *neuron)
+NeuralNetNeuron_sigmoid (NeuralNetNeuron *neuron)
 {
-    return (*neuron->output * (1 - *neuron->output));
+    return (1.0 / (1.0 + exp(-*neuron->output)));
 }
 
 
@@ -75,28 +95,27 @@ NeuralNet_create (const int nInputs, double *netInputs, const int nLayer, int *n
     for (int i = 0; i < net->nLayer; i++) // cycling the layers
     {
         net->layers[i].nNeurons = nNeurons[i];
-        
-        if (i == 0) // first layer
-        {
+
+        if (i == 0)
             net->layers[i].neurons = &net->neurons[0];
-            net->layers[i].neurons->nInputs = nInputs;
-            // the inputs to the first layer equal the inputs to the network
-        }
         else
-        {
-            net->layers[i].neurons = &net->neurons[net->layers[i - 1].nNeurons];
-            net->layers[i].neurons->nInputs = net->layers[i - 1].nNeurons;
-            net->layers[i].neurons->inputs = &net->neuronOutputs[inputCounter];
-        }
+            net->layers[i].neurons = net->layers[i - 1].neurons + net->layers[i].nNeurons;
+        
 
         for (int j = 0; j < net->layers[i].nNeurons; j++) // cycling the neurons in one layer
         {
             if (i == 0)
+            {
                 net->layers[i].neurons[j].inputs = netInputs;
-
-            if (i > 0)
-                net->neurons[neuronCounter].inputs = &net->outputs[inputCounter];
+                net->layers[i].neurons[j].nInputs = nInputs;
+            }
+            else
+            {
+                net->neurons[neuronCounter].inputs = &net->neuronOutputs[inputCounter];
                 // define the outputs of previous neuron as inputs to the next ones
+                
+                net->layers[i].neurons[j].nInputs = net->layers[i - 1].nNeurons;
+            }
 
             net->neurons[neuronCounter].weights = &net->weights[weightCounter];
             net->neurons[neuronCounter].oldWeights = &net->oldWeights[weightCounter];
@@ -145,10 +164,9 @@ NeuralNet_calculate (NeuralNet *net)
             {
                 *net->layers[i].neurons[j].output += net->layers[i].neurons[j].inputs[k] *
                     net->layers[i].neurons[j].weights[k];
+                *net->layers[i].neurons[j].output = NeuralNetNeuron_sigmoid (&net->layers[i].neurons[j]);
             }
-
         }
-
     }
 }
 
@@ -170,8 +188,9 @@ NeuralNet_train (NeuralNet *net, double *trainingIn, double *trainingOut, const 
             if (i == net->nLayer - 1) // output Layer
             {
                 for (int j = 0; j < net->layers[i].nNeurons; j++)
-                    *net->layers[i].neurons[j].error = NeuralNetNeuron_sigmoid_derivate (&net->layers[i].neurons[j])
-                        * (trainingOut[j] - *net->layers[i].neurons[j].output);
+                {
+                    *net->layers[i].neurons[j].error = pow (trainingOut[j] - *net->layers[i].neurons[j].output, 2.0);
+                }
             }
             else
             {
@@ -183,8 +202,7 @@ NeuralNet_train (NeuralNet *net, double *trainingIn, double *trainingOut, const 
                         temp += *net->layers[i + 1].neurons[k].error * 
                             net->layers[i + 1].neurons[k].weights[j];
                     }
-                    *net->layers[i].neurons[j].error = NeuralNetNeuron_sigmoid_derivate (&net->layers[i].neurons[j])
-                        * temp;
+                    *net->layers[i].neurons[j].error = *net->layers[i].neurons[j].output * temp;
                 }
             }
         }
@@ -198,16 +216,74 @@ NeuralNet_train (NeuralNet *net, double *trainingIn, double *trainingOut, const 
                 for (int k = 0; k < net->layers[i].neurons->nInputs; k++)
                 {
                     double tempWeight = net->layers[i].neurons[j].weights[k];
+                    /*
                     net->layers[i].neurons[j].weights[k] += (LEARNING_RATE * 
                             *net->layers[i].neurons[j].error *
                             net->layers[i].neurons[j].inputs[k]) + 
                         net->layers[i].neurons[j].weights[k] -
                         net->layers[i].neurons[j].oldWeights[k];
+                    */
+                    net->layers[i].neurons[j].weights[k] += LEARNING_RATE * 
+                        *net->layers[i].neurons[j].error *
+                        net->layers[i].neurons[j].inputs[k];
                     net->layers[i].neurons[j].oldWeights[k] = tempWeight;
                 }
     
             }
         }
+
+        if (it == 0 || it == iterations - 1)
+            NeuralNet_print (net);
     }
 }
 
+
+int
+NeuralNet_save (NeuralNet *net, const char *filename)
+{
+    FILE *file = fopen (filename, "w");
+    if (file)
+    {
+        fprintf (file, "%i\n", net->nInputs);
+        fprintf (file, "%i\n", net->nLayer);
+
+        for (int i = 0; i < net->nLayer; i++)
+            fprintf (file, "%i\n", net->layers[i].nNeurons);
+
+        for (int i = 0; i < net->nNeurons; i++)
+            fprintf (file, "%lf\n", net->weights[i]);
+        
+        return 1;
+    }
+    
+    return 0;
+}
+
+
+NeuralNet *
+NeuralNet_load (const char *filename, double **netInputs)
+{
+    FILE *file = fopen (filename, "r");
+    if (file)
+    {
+        int nInputs;
+        fscanf (file, "%i\n", &nInputs);
+
+        int nLayer;
+        fscanf (file, "%i\n", &nLayer);
+
+        int *neurons = malloc (sizeof(int) * nLayer);
+
+        for (int i = 0; i < nLayer; i++)
+            fscanf (file, "%i\n", &neurons[i]);
+
+        NeuralNet *net = NeuralNet_create (nInputs, *netInputs, nLayer, neurons);
+        for (int i = 0; i < net->nNeurons; i++)
+            fscanf (file, "%lf\n", &net->weights[i]);
+
+    
+        return net;
+    }
+
+    return NULL;
+}

@@ -8,7 +8,7 @@
 #include <math.h>
 
 
-#define LEARNING_RATE 0.5
+#define LEARNING_RATE 1
 
 
 typedef struct NeuralNetNeuron
@@ -48,18 +48,49 @@ typedef struct NeuralNet
     NeuralNetLayer *layers;
 } NeuralNet;
 
+/* prints the weights of the give network
+ *
+ * \param pointer to the neural network
+ */
+void NeuralNet_print (NeuralNet *net);
 
+/* creates a random number between -1.0 and 1.0
+ * to work properly srand () have to been called before
+ */
 double NeuralNet_rand (void);
 
-double NeuralNetNeuron_sigmoid_derivate (NeuralNetNeuron *neuron);
+/* returns the sigmoid of the output of the neuron */
+double NeuralNetNeuron_sigmoid (NeuralNetNeuron *neuron);
 
-
+/* creates a neural network
+ *
+ * \param number of inputs to the neural network
+ * \param pointer to the inputs of the neural network
+ * \param number of layers (including input and output layer)
+ * \param pointer to an array of ints defining the number of neurons per layer
+ *
+ * returns a pointer to the created network or NULL on failure
+ */
 NeuralNet *NeuralNet_create (const int nInputs, double *netInputs, const int nLayer, int *nNeurons);
+
+/* frees a neural network with all members */
 void NeuralNet_free (NeuralNet **net);
 
+/* calculates the output of the given network
+ * the inputs have to be set by the main program via the previous given netInputs (see create)
+ */
 void NeuralNet_calculate (NeuralNet *net);
 
+/* trains a neural network with the given training input and output with 
+ * the number of iterations
+ */
 void NeuralNet_train (NeuralNet *net, double *trainingIn, double *trainingOut, const int iterations);
+
+/* saves the weights, with some other important data, to the given filename */
+int NeuralNet_save (NeuralNet *net, const char *filename);
+
+/* loads the weights, and some other important data, from the given filename */
+NeuralNet *NeuralNet_load (const char *filename, double **netInputs);
 
 
 #endif /* _NEURALNET_H_ */
