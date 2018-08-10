@@ -269,6 +269,10 @@ NeuralNet_load (const char *filename, double **netInputs)
         int nInputs;
         fscanf (file, "%i\n", &nInputs);
 
+        *netInputs = malloc (sizeof(double) * nInputs);
+        if (! *netInputs)
+            return NULL;
+
         int nLayer;
         fscanf (file, "%i\n", &nLayer);
 
